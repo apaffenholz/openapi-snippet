@@ -437,8 +437,23 @@ const getBaseUrl = function (openApi, path, method) {
  * @return {HarParameterObject[]} Array of objects describing the parameters in a given OpenAPI method or path
  */
 const getParameterValues = function (openApi, param, location, values) {
-  let value =
-    'SOME_' + (param.type || param.schema.type).toUpperCase() + '_VALUE';
+  let type = undefined;
+  if ( 'type' in param ) {
+    type = param.type;
+  } else if ( 'schema' in param && 'type' in param.schema ) {
+    type = param.schema.type;
+  } else if ( 'content' in param ) {
+    if ( 'application/json' in param.content ) {
+      type = param.content['application/json']['schema']['type'];
+    } else if ( 'application/xml' in param.content ) {
+      type = param.content['application/xml']['schema']['type'];
+    } 
+  }
+  if ( typeof type  == undefined ) {
+    throw new Error('undefined type');
+  }
+
+  let value = 'SOME_' + type.toUpperCase() + '_VALUE';
   if (location === 'path') {
     // then default to the original place holder value (e.b. '{id}')
     value = `{${param.name}}`;
@@ -448,7 +463,7 @@ const getParameterValues = function (openApi, param, location, values) {
     value = values[param.name];
   } else if (typeof param.example !== 'undefined') {
     value = param.example;
-  } else if (typeof param.examples !== 'undefined') {
+   } else if (typeof param.examples !== 'undefined') {
     let firstExample = Object.values(param.examples)[0];
     if (
       typeof firstExample['$ref'] === 'string' &&
@@ -462,7 +477,13 @@ const getParameterValues = function (openApi, param, location, values) {
     typeof param.schema.example !== 'undefined'
   ) {
     value = param.schema.example;
-  } else if (typeof param.default !== 'undefined') {
+  } else if ( 
+    'content' in param  &&
+    'application/json' in param.content  && 
+    'example' in param.content["application/json"]['schema']
+  ) {
+    value = encodeURIComponent(JSON.stringify( param.content["application/json"]['schema']['example'] ));
+    } else if (typeof param.default !== 'undefined') {
     value = param.default;
   }
 
